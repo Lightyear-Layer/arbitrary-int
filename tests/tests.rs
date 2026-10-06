@@ -4526,31 +4526,31 @@ mod bytemuck {
 
 #[cfg(feature = "bin-proto")]
 mod bin_proto_tests {
-    use bin_proto::{bitstream_io::BitsWritten, BitCodec, LittleEndian};
+    use bin_proto::{
+        bitstream_io::BitsWritten, BitDecode, BitDecodeExt, BitEncode, BitEncodeExt, LittleEndian,
+    };
 
     use super::*;
 
     #[track_caller]
     fn test_roundtrip<T>(input: T, expected_buffer: &[u8])
     where
-        T: Integer + BitCodec,
+        T: Integer + BitEncode<LittleEndian> + BitDecode<LittleEndian>,
     {
         let mut data = [0u8; 16];
         let mut counter = BitsWritten::<u64>::new();
         let n_bytes = input
-            .encode_bytes_buf(LittleEndian, &mut data)
+            .encode_bytes_buf(&mut data)
             .unwrap()
             .try_into()
             .unwrap();
-        input
-            .encode::<_, LittleEndian>(&mut counter, &mut (), ())
-            .unwrap();
+        input.encode(&mut counter, &mut (), ()).unwrap();
         assert_eq!(T::BITS, counter.written().try_into().unwrap());
         assert_eq!(expected_buffer, &data[0..n_bytes]);
 
         assert_eq!(
             (input, T::BITS as u64),
-            T::decode_bytes(expected_buffer, LittleEndian).unwrap()
+            T::decode_bytes(expected_buffer).unwrap()
         );
     }
 

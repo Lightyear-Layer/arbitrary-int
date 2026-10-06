@@ -701,17 +701,17 @@ macro_rules! impl_bin_proto {
     ($type:tt, $trait:ident, $($bits:literal),+) => {
         $(
             #[cfg(feature = "bin-proto")]
-            impl<T: BuiltinInteger + $trait, Ctx> bin_proto::BitEncode<Ctx> for $type<T, $bits>
+            impl<E, T: BuiltinInteger + $trait, Ctx> bin_proto::BitEncode<E, Ctx> for $type<T, $bits>
             where
+                E: bin_proto::Endianness,
                 Self: Integer,
-                <Self as Integer>::UnderlyingType: bin_proto::BitEncode<Ctx, bin_proto::Bits<$bits>>,
+                <Self as Integer>::UnderlyingType: bin_proto::BitEncode<E, Ctx, bin_proto::Bits<$bits>>,
             {
-                fn encode<W, E>(&self, write: &mut W, ctx: &mut Ctx, (): ()) -> bin_proto::Result<()>
+                fn encode<W>(&self, write: &mut W, ctx: &mut Ctx, (): ()) -> bin_proto::Result<()>
                 where
-                    W: bin_proto::BitWrite,
-                    E: bin_proto::Endianness,
+                    W: bin_proto::BitWrite + ?Sized,
                 {
-                    bin_proto::BitEncode::encode::<_, E>(
+                    bin_proto::BitEncode::<_, _, _>::encode(
                         &Integer::value(*self),
                         write,
                         ctx,
@@ -721,24 +721,21 @@ macro_rules! impl_bin_proto {
             }
 
             #[cfg(feature = "bin-proto")]
-            impl<T: BuiltinInteger + $trait, Ctx> bin_proto::BitDecode<Ctx>
+            impl<E, T: BuiltinInteger + $trait, Ctx> bin_proto::BitDecode<E, Ctx>
                 for $type<T, $bits>
             where
+                E: bin_proto::Endianness,
                 Self: Integer,
-                <Self as Integer>::UnderlyingType: bin_proto::BitDecode<Ctx, bin_proto::Bits<$bits>>,
+                <Self as Integer>::UnderlyingType: bin_proto::BitDecode<E, Ctx, bin_proto::Bits<$bits>>,
             {
-                fn decode<R, E>(read: &mut R, ctx: &mut Ctx, (): ()) -> bin_proto::Result<Self>
+                fn decode<R>(read: &mut R, ctx: &mut Ctx, (): ()) -> bin_proto::Result<Self>
                 where
-                    R: bin_proto::BitRead,
-                    E: bin_proto::Endianness,
+                    R: bin_proto::BitRead + ?Sized,
                 {
                     Self::try_new(
-                        <<Self as Integer>::UnderlyingType as bin_proto::BitDecode<_, _>>::decode::<
-                            _,
-                            E,
-                        >(read, ctx, bin_proto::Bits::<$bits>)?,
+                        <<Self as Integer>::UnderlyingType as bin_proto::BitDecode<_, _, _>>::decode(read, ctx, bin_proto::Bits::<$bits>)?,
                     ).map_err(|_|
-                        bin_proto::Error::Other("Value too large to fit within this integer type")
+                        bin_proto::Error::msg("Value too large to fit within this integer type")
                     )
                 }
             }
